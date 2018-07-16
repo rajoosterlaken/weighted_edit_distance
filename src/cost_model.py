@@ -13,9 +13,10 @@ class CostModel(object):
     # =============
     # Setup Section
     # =============
-    def __init__(self, name_pair_class, csv_processor, input_file_path):
+    def __init__(self, name_pair_class, csv_processor, input_file_path, filter_enabled = False):
         self.timer = Timer()
         self.name_pair_class = name_pair_class
+        self.filter_enabled = filter_enabled
         self.invalid_characters = punctuation + digits
         self.invalid_name_pair_rows = 0
         self.normalized_pairs = 0
@@ -26,7 +27,14 @@ class CostModel(object):
         self.substring_reference_counter = Counter()
         self.max_substring_length = 2
         self.max_substring_str = []
-        print(f"[CM] Cost model initialized: {len(self.name_pairs)} name pairs loaded ({self.invalid_name_pair_rows} invalid | {self.normalized_pairs} normalized | {self.equivalent_variants} equal).")
+        print(f"[CM] Cost model initialized:")
+        print(f"[CM] Name variant pairs loaded: {len(self.name_pairs)}")
+        filter_string = "Enabled:" if filter_enabled else "Disabled"
+        print(f"[CM] Filter {filter_string}")
+        if filter_enabled:
+            print(f"[CM] \tPunctuation/Digit Filtered Name Variant Pairs: {self.invalid_name_pair_rows}")
+            print(f"[CM] \tNormalised Pairs: {self.normalized_pairs}")
+            print(f"[CM] \tEquivalent After Normalisation: {self.equivalent_variants}")
 
 
     def is_invalid_name_pair(self, name_pair):
@@ -36,14 +44,15 @@ class CostModel(object):
 
 
     def convert_row_to_name_pair(self, row):
-        name_pair = self.name_pair_class(*row)
-        if self.is_invalid_name_pair(name_pair):
-            self.invalid_name_pair_rows += 1
-            return None
-        if name_pair.altered_variant1 or name_pair.altered_variant2:
-            self.normalized_pairs += 1
-        if name_pair.variant1 == name_pair.variant2:
-            self.equivalent_variants += 1
+        name_pair = self.name_pair_class(*row, normalise_variants = self.filter_enabled)
+        if self.filter_enabled:
+            if self.is_invalid_name_pair(name_pair):
+                self.invalid_name_pair_rows += 1
+                return None
+            if name_pair.altered_variant1 or name_pair.altered_variant2:
+                self.normalized_pairs += 1
+            if name_pair.variant1 == name_pair.variant2:
+                self.equivalent_variants += 1
         return name_pair
 
 

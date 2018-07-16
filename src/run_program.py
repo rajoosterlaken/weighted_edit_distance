@@ -47,11 +47,11 @@ def get_name_pair_class(input_file_path):
     return None
 
 
-def create_model(csv_processor, input_file_path):
+def create_model(csv_processor, input_file_path, filter_enabled):
     name_pair_class = get_name_pair_class(input_file_path)
     if not name_pair_class:
         return None
-    model = CostModel(name_pair_class, csv_processor, input_file_path)
+    model = CostModel(name_pair_class, csv_processor, input_file_path, filter_enabled = filter_enabled)
     model.train()
     return model
 
@@ -61,14 +61,14 @@ def pickle_model(model, pickle_file_path):
         dump(model, pickle_file)
 
 
-def create_models(models, csv_processor, output_folder_path):
+def create_models(models, csv_processor, output_folder_path, filter_enabled):
     input_file_paths = get_input_file_paths()
 
     for input_file_path in input_file_paths:
         model_name = input_file_path.split(sep)[-1][:-4]
 
         print(f"[MAIN] Creating cost model '{model_name}'")
-        models[model_name] = create_model(csv_processor, input_file_path)
+        models[model_name] = create_model(csv_processor, input_file_path, filter_enabled)
         print("[MAIN] Cost model created")
 
         print(f"[MAIN] Pickling cost model '{model_name}'")
@@ -76,7 +76,7 @@ def create_models(models, csv_processor, output_folder_path):
         print(f"[MAIN] Pickle created.")
 
 
-def load_models(pickle_folder_path, models):
+def load_models(pickle_folder_path, models, filter_enabled):
     print(f"[MAIN] len(models) models from pickles at '{pickle_folder_path}' loaded")
     for file_name in listdir(pickle_folder_path):
         model_name = file_name[:-4]
@@ -85,19 +85,19 @@ def load_models(pickle_folder_path, models):
             models[model_name] = load(pickle_file)
 
 
-def init_models(csv_processor, output_folder_path):
+def init_models(csv_processor, output_folder_path, filter_enabled):
     models = {}
     pickles_loaded = False
     if len(sys.argv) > 1:
         print(f"[MAIN] Attempting pickle folder load...")
         pickle_folder_path = filter_pickle_folder_path()
         if pickle_folder_path:
-            load_models(pickle_folder_path, models)
+            load_models(pickle_folder_path, models, filter_enabled)
             pickles_loaded = True
         else:
             print(f"[MAIN] Pickle folder deemed invalid; creating models instead")
     if not pickles_loaded:
-        create_models(models, csv_processor, output_folder_path)
+        create_models(models, csv_processor, output_folder_path, filter_enabled)
     return models
 
 
@@ -160,32 +160,30 @@ def create_top_100s(models, csv_processor, output_folder_path):
             csv_processor.write_csv_rows(output_file_path, sort_rows(rows))
 
 
+def query_filter_status():
+    prompt = f"[MAIN] Run name variant pair cleaning beforehand?\n[MAIN] (This removes pairs with punctuation/digits & normalises variants)\nInput [Y/N] :> "
+    answer = input(prompt).upper()
+    if answer == "Y":
+        print("[Main] Filter enabled.")
+        return True
+    elif answer == "N":
+        print("[Main] Filter disabled.")
+        return False
+    else:
+        print("[MAIN] Invalid answer, filter disabled.")
+        return False
+
+
+
 def main():
     csv_processor = CsvProcessor()
     output_folder_path = generate_output_folder()
-
+    filter_enabled = query_filter_status()
+    
     global models
-    models = init_models(csv_processor, output_folder_path)
+    models = init_models(csv_processor, output_folder_path, filter_enabled)
 
     create_top_100s(models, csv_processor, output_folder_path)
-
-
-def unique_name_pairs(model):
-    not_found = []
-    deleted = 0
-    i = 1
-    for name_pair1 in model.name_pairs:
-        v1, v2 = name_pair1.variant1, name_pair1.variant2
-        pair_tuple = (v1,v2) if v1<v2 else (v2,v1)
-        if pair_tuple not in not_found:
-            not_found.append(pair_tuple)
-        else:
-            tuple_index = not_found.index(pair_tuple)
-            del not_found[tuple_index]
-            deleted += 1
-        print(f"{i} - len: {len(not_found)} - dels: {deleted}          \r", end="")
-        i += 1
-    return not_found
 
 
 if __name__ == '__main__':
