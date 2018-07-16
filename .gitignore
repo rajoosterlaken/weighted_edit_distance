@@ -1,5 +1,7 @@
 # Visual Studio
 .vscode/
+output/
+latex/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
